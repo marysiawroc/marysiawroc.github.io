@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Countdown to the meet up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/png" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page-bg:#123626;
+    --court-outer:#123B58;
+    --court-inner:#1D5E8C;
+    --court-line:#F4F1E8;
+    --clay:#C1502E;
+    --ball:#D6EE45;
+    --ball-shadow:#8FA82A;
+    --ink:#0B1F1C;
+    --panel-bg:rgba(8,24,38,0.9);
+    --panel-edge:rgba(244,241,232,0.24);
+    --font-display:'Anton', Impact, 'Arial Narrow', sans-serif;
+    --font-body:'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono:'Space Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(circle at 50% 10%, rgba(214,238,69,0.07), transparent 45%),
+      var(--page-bg);
+    color:var(--court-line);
+    font-family:var(--font-body);
+    overflow-x:hidden;
+  }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  a, button{ font-family:inherit; }
+  a:focus-visible, button:focus-visible{
+    outline:2px solid var(--ball);
+    outline-offset:3px;
+    border-radius:4px;
+  }
+
+  .sound-toggle{
+    position:fixed;
+    top:16px; right:16px;
+    z-index:20;
+    width:38px; height:38px;
+    border-radius:50%;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-edge);
+    color:var(--court-line);
+    font-size:1rem;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    backdrop-filter: blur(4px);
+    transition:border-color .2s ease, background .2s ease;
+  }
+  .sound-toggle:hover{ border-color:var(--ball); }
+
+  .wrap{
+    position:relative;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:6vh 5vw 6vh;
+    gap:3.6vh;
+  }
+
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:0.78rem;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    color:var(--ball);
+    opacity:0.85;
+    margin:0 0 0.6rem;
+    text-align:center;
+  }
+
+  h1{
+    font-family:var(--font-display);
+    font-weight:400;
+    font-size:clamp(2rem, 5.6vw, 3.6rem);
+    letter-spacing:0.01em;
+    text-transform:uppercase;
+    text-align:center;
+    margin:0;
+    color:var(--court-line);
+    line-height:1.02;
+  }
+  h1 span{ color:var(--ball); }
+
+  /* ---------- COURT STAGE ---------- */
+  .stage{
+    position:relative;
+    width:min(84vw, 340px);
+    aspect-ratio: 300 / 560;
+    filter: drop-shadow(0 22px 34px rgba(0,0,0,0.45));
+  }
+  .stage::after{
+    content:"";
+    position:absolute; inset:0;
+    background:var(--ball);
+    opacity:0;
+    border-radius:6px;
+    pointer-events:none;
+  }
+  .stage.impact-flash{ animation: impactShake 0.28s ease; }
+  .stage.impact-flash::after{ animation: flashPulse 0.28s ease; }
+  @keyframes impactShake{
+    0%{ transform:translate(0,0); }
+    20%{ transform:translate(-3px,2px) rotate(-0.4deg); }
+    40%{ transform:translate(3px,-2px) rotate(0.4deg); }
+    60%{ transform:translate(-2px,1px); }
+    80%{ transform:translate(2px,-1px); }
+    100%{ transform:translate(0,0); }
+  }
+  @keyframes flashPulse{
+    0%{ opacity:0; } 30%{ opacity:.35; } 100%{ opacity:0; }
+  }
+
+  .court-bg{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block;
+  }
+
+  .flight-path{
+    fill:none;
+    stroke:var(--ball);
+    stroke-width:2.4;
+    stroke-linecap:round;
+    stroke-dasharray:1;
+    stroke-dashoffset:1;
+    opacity:0;
+    vector-effect:non-scaling-stroke;
+  }
+  @keyframes drawPath{
+    0%{ opacity:0.85; stroke-dashoffset:1; }
+    100%{ opacity:0; stroke-dashoffset:0; }
+  }
+
+  .landing-ring{
+    position:absolute;
+    left:33.3%; top:36.6%;
+    width:26px; height:26px;
+    margin:-13px 0 0 -13px;
+    border-radius:50%;
+    border:2px solid var(--ball);
+    opacity:0;
+    pointer-events:none;
+    z-index:2;
+  }
+  @keyframes ringPulse{
+    0%{ opacity:0.9; transform:scale(0.3); }
+    100%{ opacity:0; transform:scale(2.1); }
+  }
+
+  /* ---------- BALL ---------- */
+  .ball-zone{
+    position:absolute;
+    left:68.3%; top:97.3%;
+    width:clamp(30px, 9%, 36px);
+    height:clamp(30px, 9%, 36px);
+    margin-left:calc(-1 * clamp(15px, 4.5%, 18px));
+    margin-top:calc(-1 * clamp(15px, 4.5%, 18px));
+    cursor:pointer;
+    -webkit-tap-highlight-color: transparent;
+    z-index:3;
+    background:none; border:none; padding:0;
+    display:block;
+  }
+
+  .ball-zone.first-time::before{
+    content:"";
+    position:absolute; inset:-10px;
+    border-radius:50%;
+    border:2px solid var(--ball);
+    opacity:0.6;
+    animation:pulseRing 1.6s ease-out infinite;
+    pointer-events:none;
+  }
+  @keyframes pulseRing{
+    0%{ transform:scale(0.8); opacity:0.6; }
+    100%{ transform:scale(1.7); opacity:0; }
+  }
+
+  .ball{
+    position:absolute; inset:0;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 34% 30%, #EAFF7A 0%, var(--ball) 42%, var(--ball-shadow) 100%);
+    box-shadow:
+      inset 0 -6px 10px rgba(0,0,0,0.25),
+      inset 0 5px 8px rgba(255,255,255,0.25),
+      0 8px 14px rgba(0,0,0,0.4);
+    display:flex; align-items:center; justify-content:center;
+    transform-origin:center;
+    animation: idleBounce 1.8s ease-in-out infinite;
+  }
+  .ball::before, .ball::after{
+    content:"";
+    position:absolute;
+    width:190%; height:60%;
+    border:2px solid rgba(244,241,232,0.55);
+    border-radius:50%;
+    top:20%;
+  }
+  .ball::before{ left:-58%; transform:rotate(18deg); }
+  .ball::after{ right:-58%; transform:rotate(-18deg); }
+
+  .ball-label{
+    font-family:var(--font-display);
+    font-size:clamp(0.6rem, 2vw, 0.72rem);
+    letter-spacing:0.04em;
+    color:var(--ink);
+    position:relative;
+    z-index:2;
+    user-select:none;
+  }
+
+  @keyframes idleBounce{
+    0%,100%{ transform:translateY(0) scale(1); }
+    50%{ transform:translateY(-5px) scale(1.02); }
+  }
+
+  @keyframes serveFlightAce{
+    0%{   left:68.3%; top:97.3%; transform:scale(1); }
+    12%{  left:65%;   top:87%;   transform:scale(1.05); }
+    30%{  left:57%;   top:69%;   transform:scale(1.1); }
+    50%{  left:49%;   top:50%;   transform:scale(1.18); }
+    68%{  left:41%;   top:42%;   transform:scale(1.0); }
+    82%{  left:34.5%; top:37.5%; transform:scale(0.88); }
+    90%{  left:33.3%; top:32.5%; transform:scale(0.85); }
+    100%{ left:33.3%; top:36.6%; transform:scale(0.7); opacity:0; }
+  }
+
+  @keyframes serveFlightFault{
+    0%{   left:68.3%; top:97.3%; transform:scale(1); }
+    20%{  left:60%;   top:78%;   transform:scale(1.05); }
+    45%{  left:50%;   top:55%;   transform:scale(1.1); }
+    70%{  left:30%;   top:40%;   transform:scale(1.0); }
+    100%{ left:1.7%;  top:32%;   transform:scale(0.8); opacity:0; }
+  }
+
+  @keyframes serveFlightLet{
+    0%{   left:68.3%; top:97.3%; transform:scale(1); }
+    40%{  left:63%;   top:75%;   transform:scale(1.05); }
+    75%{  left:58%;   top:58%;   transform:scale(1.0); }
+    100%{ left:56.7%; top:51.8%; transform:scale(0.85); opacity:0; }
+  }
+
+  @keyframes labelOut{
+    0%{ opacity:1; } 100%{ opacity:0; }
+  }
+
+  /* ---------- RACKET ---------- */
+  .racket{
+    position:absolute;
+    left:68.3%; top:97.3%;
+    width:clamp(46px, 15%, 60px);
+    height:clamp(46px, 15%, 60px);
+    margin-left:calc(-1 * clamp(8px, 2%, 10px));
+    margin-top:calc(-1 * clamp(40px, 13%, 52px));
+    transform-origin: 30% 92%;
+    transform: rotate(52deg);
+    z-index:2;
+    pointer-events:none;
+  }
+  .racket svg{ width:100%; height:100%; overflow:visible; }
+
+  @keyframes serveSwing{
+    0%{   transform:rotate(52deg); }
+    55%{  transform:rotate(-38deg); }
+    100%{ transform:rotate(-58deg); opacity:0; }
+  }
+
+  .hint{
+    font-family:var(--font-mono);
+    font-size:0.72rem;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--court-line);
+    opacity:0.5;
+    text-align:center;
+    transition:opacity .3s ease;
+    min-height:1.4em;
+  }
+  .hint.hidden{ opacity:0; }
+
+  .serve-indicator{
+    display:flex;
+    gap:0.4rem;
+    justify-content:center;
+    margin-top:0.5rem;
+  }
+  .serve-indicator .dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    border:1.5px solid var(--court-line);
+    opacity:0.45;
+    transition:background .25s ease, opacity .25s ease, transform .25s ease;
+  }
+  .serve-indicator .dot.used{
+    background:var(--clay);
+    border-color:var(--clay);
+    opacity:0.9;
+    transform:scale(1.1);
+  }
+  .serve-indicator .dot.active{
+    background:var(--ball);
+    border-color:var(--ball);
+    opacity:1;
+  }
+
+  .stage.impact-flash-strong{ animation: impactShakeBig 0.42s ease; }
+  .stage.impact-flash-strong::after{
+    background:var(--clay);
+    animation: flashPulseBig 0.42s ease;
+  }
+  @keyframes impactShakeBig{
+    0%{ transform:translate(0,0) rotate(0); }
+    15%{ transform:translate(-7px,4px) rotate(-1deg); }
+    30%{ transform:translate(6px,-4px) rotate(1deg); }
+    45%{ transform:translate(-5px,3px) rotate(-0.8deg); }
+    60%{ transform:translate(5px,-3px) rotate(0.6deg); }
+    75%{ transform:translate(-3px,2px); }
+    100%{ transform:translate(0,0) rotate(0); }
+  }
+  @keyframes flashPulseBig{
+    0%{ opacity:0; } 22%{ opacity:.55; } 55%{ opacity:.15; } 100%{ opacity:0; }
+  }
+
+  .df-toast{
+    position:fixed;
+    left:50%; top:18px;
+    transform:translate(-50%,-12px);
+    background:var(--panel-bg);
+    border:1px solid var(--clay);
+    color:var(--court-line);
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    padding:0.5rem 0.9rem;
+    border-radius:999px;
+    opacity:0;
+    z-index:30;
+    pointer-events:none;
+    animation: toastPop 2.1s ease forwards;
+  }
+  @keyframes toastPop{
+    0%{ opacity:0; transform:translate(-50%,-4px); }
+    12%{ opacity:1; transform:translate(-50%,0); }
+    82%{ opacity:1; }
+    100%{ opacity:0; transform:translate(-50%,-8px); }
+  }
+
+  /* ---------- RESULT flash (Ace / Fault / Let) ---------- */
+  .result-flash{
+    position:absolute;
+    transform:translate(-50%,-50%) scale(0.5);
+    font-family:var(--font-display);
+    font-size:clamp(1.2rem, 5.6vw, 1.9rem);
+    letter-spacing:0.04em;
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    opacity:0;
+    pointer-events:none;
+    white-space:nowrap;
+    z-index:4;
+  }
+  @keyframes resultFlash{
+    0%{   opacity:0; transform:translate(-50%,-50%) scale(0.4) rotate(-6deg); }
+    35%{  opacity:1; transform:translate(-50%,-50%) scale(1.1) rotate(2deg); }
+    55%{  transform:translate(-50%,-50%) scale(1) rotate(0deg); }
+    85%{  opacity:1; }
+    100%{ opacity:0; transform:translate(-50%,-62%) scale(0.94) rotate(0deg); }
+  }
+
+  /* ---------- ON-COURT COUNTDOWN PANEL ---------- */
+  .court-board{
+    position:absolute;
+    left:9%;
+    width:82%;
+    top:24%;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-edge);
+    border-radius:10px;
+    padding:0.85rem 0.7rem 0.9rem;
+    box-shadow: 0 14px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    backdrop-filter: blur(2px);
+    opacity:0;
+    transform:translateY(18px) scale(0.95);
+    visibility:hidden;
+    z-index:6;
+    transition:opacity .5s cubic-bezier(.2,.8,.3,1), transform .5s cubic-bezier(.2,.8,.3,1), visibility 0s linear .5s, box-shadow .4s ease;
+  }
+  .court-board.show{
+    opacity:1;
+    transform:translateY(0) scale(1);
+    visibility:visible;
+    transition:opacity .5s cubic-bezier(.2,.8,.3,1), transform .5s cubic-bezier(.2,.8,.3,1), visibility 0s linear 0s, box-shadow .4s ease;
+  }
+  .court-board.celebrate{
+    box-shadow: 0 0 0 2px var(--ball), 0 14px 34px rgba(214,238,69,0.28);
+    animation: glowPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes glowPulse{
+    0%,100%{ box-shadow:0 0 0 2px var(--ball), 0 14px 28px rgba(214,238,69,0.16); }
+    50%{ box-shadow:0 0 0 2px var(--ball), 0 14px 38px rgba(214,238,69,0.38); }
+  }
+
+  .board-title{
+    font-family:var(--font-mono);
+    font-size:0.58rem;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    text-align:center;
+    color:var(--ball);
+    opacity:0.9;
+    margin:0 0 0.6rem;
+  }
+
+  .digits{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:0.35rem;
+  }
+
+  .digit-cell{ text-align:center; }
+
+  .digit-value{
+    font-family:var(--font-mono);
+    font-weight:700;
+    font-size:clamp(0.95rem, 4.6vw, 1.4rem);
+    background:var(--ink);
+    border-radius:5px;
+    padding:0.32rem 0.1rem;
+    color:var(--ball);
+    letter-spacing:0.01em;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.06);
+    font-variant-numeric: tabular-nums;
+  }
+  .digit-value.flip{ animation: digitPop .4s cubic-bezier(.2,.8,.3,1); }
+  @keyframes digitPop{
+    0%{ transform:translateY(-6px); opacity:0.4; }
+    100%{ transform:translateY(0); opacity:1; }
+  }
+
+  .digit-label{
+    font-family:var(--font-mono);
+    font-size:0.46rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--court-line);
+    opacity:0.55;
+    margin-top:0.3rem;
+  }
+
+  .board-sub{
+    text-align:center;
+    font-family:var(--font-body);
+    font-size:0.62rem;
+    color:var(--court-line);
+    opacity:0.6;
+    margin:0.7rem 0 0;
+  }
+
+  .replay-court{
+    display:block;
+    margin:0.7rem auto 0;
+    background:none;
+    border:1px solid var(--panel-edge);
+    color:var(--court-line);
+    font-family:var(--font-mono);
+    font-size:0.58rem;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    padding:0.42rem 0.9rem;
+    border-radius:999px;
+    cursor:pointer;
+    opacity:0.75;
+    transition:opacity .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .replay-court:hover{
+    opacity:1;
+    border-color:var(--ball);
+    background:rgba(214,238,69,0.1);
+  }
+
+  /* ---------- confetti ---------- */
+  .confetti-piece{
+    position:fixed;
+    top:-16px;
+    width:8px; height:14px;
+    opacity:0.95;
+    pointer-events:none;
+    z-index:60;
+    animation-name:confettiFall;
+    animation-timing-function:cubic-bezier(.3,.6,.4,1);
+    animation-fill-mode:forwards;
+  }
+  @keyframes confettiFall{
+    0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform:translateY(110vh) rotate(540deg); opacity:0; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .ball, .ball-zone.first-time::before, .court-board.celebrate{ animation:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<button class="sound-toggle" id="soundToggle" type="button" aria-pressed="true" aria-label="Mute sound effects">🔊</button>
+
+<div class="wrap">
+  <div>
+    <p class="eyebrow">Match point incoming</p>
+    <h1>Serve up the <span>HIT</span></h1>
+  </div>
+
+  <div class="stage" id="stage">
+    <svg class="court-bg" viewBox="0 0 300 560" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="300" height="560" rx="6" fill="var(--court-outer)"/>
+      <rect x="6" y="6" width="288" height="548" rx="4" fill="var(--court-inner)"/>
+
+      <rect x="20" y="20" width="260" height="520" fill="none" stroke="var(--court-line)" stroke-width="2.5" opacity="0.92"/>
+      <line x1="52.5" y1="20" x2="52.5" y2="540" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="247.5" y1="20" x2="247.5" y2="540" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="52.5" y1="140" x2="247.5" y2="140" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="52.5" y1="420" x2="247.5" y2="420" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="150" y1="140" x2="150" y2="420" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="150" y1="20" x2="150" y2="28" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="150" y1="532" x2="150" y2="540" stroke="var(--court-line)" stroke-width="2" opacity="0.85"/>
+      <line x1="14" y1="280" x2="286" y2="280" stroke="var(--court-line)" stroke-width="4" opacity="0.95"/>
+      <line x1="14" y1="280" x2="286" y2="280" stroke="var(--ink)" stroke-width="4" stroke-dasharray="3 4" opacity="0.5"/>
+      <line x1="14" y1="276" x2="14" y2="284" stroke="var(--court-line)" stroke-width="3"/>
+      <line x1="286" y1="276" x2="286" y2="284" stroke="var(--court-line)" stroke-width="3"/>
+
+      <path class="flight-path" id="flightPath" pathLength="1" d="M 205,545 Q 150,280 100,205" />
+    </svg>
+
+    <div class="landing-ring" id="landingRing"></div>
+
+    <div class="racket" id="racket">
+      <svg viewBox="0 0 200 200" fill="none">
+        <ellipse cx="105" cy="70" rx="58" ry="70" stroke="#F4F1E8" stroke-width="7" fill="rgba(244,241,232,0.05)"/>
+        <g stroke="#F4F1E8" stroke-width="1.4" opacity="0.75">
+          <line x1="60" y1="20" x2="60" y2="120"/>
+          <line x1="80" y1="8" x2="80" y2="132"/>
+          <line x1="100" y1="2" x2="100" y2="138"/>
+          <line x1="120" y1="8" x2="120" y2="132"/>
+          <line x1="140" y1="20" x2="140" y2="120"/>
+          <line x1="52" y1="45" x2="152" y2="45"/>
+          <line x1="48" y1="68" x2="156" y2="68"/>
+          <line x1="48" y1="91" x2="156" y2="91"/>
+          <line x1="52" y1="114" x2="152" y2="114"/>
+        </g>
+        <rect x="98" y="132" width="12" height="60" rx="5" fill="#C1502E"/>
+        <rect x="96" y="182" width="16" height="14" rx="4" fill="#8F3A20"/>
+      </svg>
+    </div>
+
+    <button class="ball-zone" id="ballZone" type="button" aria-label="Serve the ball">
+      <div class="ball" id="ball">
+        <span class="ball-label" id="ballLabel">HIT</span>
+      </div>
+    </button>
+
+    <span class="result-flash" id="resultFlash"></span>
+
+    <div class="court-board" id="board">
+      <p class="board-title" id="boardTitle">Counting down to meet up</p>
+      <div class="digits">
+        <div class="digit-cell"><div class="digit-value" id="d-days">00</div><div class="digit-label">Days</div></div>
+        <div class="digit-cell"><div class="digit-value" id="d-hours">00</div><div class="digit-label">Hrs</div></div>
+        <div class="digit-cell"><div class="digit-value" id="d-mins">00</div><div class="digit-label">Min</div></div>
+        <div class="digit-cell"><div class="digit-value" id="d-secs">00</div><div class="digit-label">Sec</div></div>
+      </div>
+      <p class="board-sub" id="boardSub">Local time</p>
+      <button class="replay-court" id="replayBtn" type="button">&#8635; Serve again</button>
+    </div>
+  </div>
+
+  <p class="hint" id="hint">Tap the ball to serve</p>
+  <div class="serve-indicator" id="serveIndicator" aria-hidden="true">
+    <span class="dot active" id="dot1"></span>
+    <span class="dot" id="dot2"></span>
+  </div>
+  <p class="sr-only" id="srStatus" aria-live="polite"></p>
+</div>
+
+<script>
+  // ================= Config from URL =================
+  const params = new URLSearchParams(location.search);
+  const customEvent = (params.get('event') || '').trim();
+  const customDateStr = params.get('date');
+  const eventName = customEvent || 'game time';
+
+  function getTarget(){
+    if (customDateStr){
+      const d = new Date(customDateStr);
+      if (!isNaN(d.getTime())) return d;
+    }
+    const now = new Date();
+    let year = now.getFullYear();
+    let target = new Date(year, 11, 20, 13, 0, 0); // December 20, 13:00 local time
+    if (target.getTime() <= now.getTime()){
+      target = new Date(year + 1, 11, 20, 13, 0, 0);
+    }
+    return target;
+  }
+
+  document.getElementById('boardTitle').textContent = customEvent
+    ? `Counting down to ${eventName}`
+    : 'Counting down to meet up';
+
+  // ================= Elements =================
+  const stage = document.getElementById('stage');
+  const ballZone = document.getElementById('ballZone');
+  const ball = document.getElementById('ball');
+  const ballLabel = document.getElementById('ballLabel');
+  const racket = document.getElementById('racket');
+  const flightPath = document.getElementById('flightPath');
+  const landingRing = document.getElementById('landingRing');
+  const resultFlash = document.getElementById('resultFlash');
+  const board = document.getElementById('board');
+  const hint = document.getElementById('hint');
+  const srStatus = document.getElementById('srStatus');
+  const replayBtn = document.getElementById('replayBtn');
+  const soundToggle = document.getElementById('soundToggle');
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let animating = false;
+  let revealed = false;
+
+  // ================= Sound =================
+  let soundOn = localStorage.getItem('tc_sound') !== 'off';
+  function updateSoundBtn(){
+    soundToggle.textContent = soundOn ? '🔊' : '🔇';
+    soundToggle.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    soundToggle.setAttribute('aria-label', soundOn ? 'Mute sound effects' : 'Unmute sound effects');
+  }
+  updateSoundBtn();
+  soundToggle.addEventListener('click', () => {
+    soundOn = !soundOn;
+    localStorage.setItem('tc_sound', soundOn ? 'on' : 'off');
+    updateSoundBtn();
+  });
+
+  let audioCtx = null;
+  function getCtx(){
+    if (!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(err){ audioCtx = null; }
+    }
+    return audioCtx;
+  }
+  function tone(freqStart, freqEnd, dur, type, gainPeak, delay){
+    if (!soundOn) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const t0 = ctx.currentTime + (delay || 0) / 1000;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freqStart, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), t0 + dur / 1000);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(gainPeak, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur / 1000);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur / 1000 + 0.02);
+  }
+  function playThwock(){ tone(320, 90, 160, 'triangle', 0.22, 0); }
+  function playAceChime(delay){
+    tone(660, 880, 140, 'sine', 0.18, delay);
+    tone(880, 1180, 160, 'sine', 0.16, delay + 90);
+  }
+  function playFaultBuzz(delay){ tone(180, 60, 260, 'sawtooth', 0.14, delay); }
+  function playLetPluck(delay){ tone(500, 260, 120, 'triangle', 0.14, delay); }
+  function playDoubleFaultBuzz(delay){
+    tone(220, 70, 220, 'sawtooth', 0.19, delay);
+    tone(160, 45, 280, 'sawtooth', 0.17, delay + 190);
+  }
+
+  // ================= First-time hint =================
+  if (localStorage.getItem('tc_hasServed') !== 'yes'){
+    ballZone.classList.add('first-time');
+  }
+  function markServed(){
+    if (localStorage.getItem('tc_hasServed') !== 'yes'){
+      localStorage.setItem('tc_hasServed', 'yes');
+      ballZone.classList.remove('first-time');
+    }
+  }
+
+  // ================= Serve outcomes =================
+  let onSecondServe = false;
+  let doubleFaultCount = 0;
+
+  const dot1 = document.getElementById('dot1');
+  const dot2 = document.getElementById('dot2');
+  function updateServeIndicator(){
+    if (!onSecondServe){
+      dot1.classList.add('active'); dot1.classList.remove('used');
+      dot2.classList.remove('active', 'used');
+    } else {
+      dot1.classList.remove('active'); dot1.classList.add('used');
+      dot2.classList.add('active'); dot2.classList.remove('used');
+    }
+  }
+
+  function showDoubleFaultToast(count){
+    const toast = document.createElement('div');
+    toast.className = 'df-toast';
+    toast.textContent = `Double fault \u00d7${count} today`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2200);
+  }
+
+  const OUTCOMES = {
+    ace:   { dur:1100, keyframe:'serveFlightAce',   path:'M 205,545 Q 150,280 100,205',
+             flashDelay:920, flashDur:800, soundDelay:950, sound:playAceChime,
+             text:'ACE!', color:'var(--ball)', pos:{left:'33.3%', top:'12%'},
+             impactDelay:940, reveal:true },
+    fault: { dur:950,  keyframe:'serveFlightFault', path:'M 205,545 Q 140,260 5,180',
+             flashDelay:820, flashDur:700, soundDelay:840, sound:playFaultBuzz,
+             text:'FAULT', color:'var(--clay)', pos:{left:'16%', top:'30%'},
+             impactDelay:830, reveal:false, resetDelay:1550,
+             hintText:'Fault \u2014 second serve' },
+    doubleFault: { dur:950, keyframe:'serveFlightFault', path:'M 205,545 Q 140,260 5,180',
+             flashDelay:820, flashDur:750, soundDelay:820, sound:playDoubleFaultBuzz,
+             text:'DOUBLE FAULT', color:'var(--clay)', pos:{left:'50%', top:'16%'},
+             impactDelay:830, reveal:false, resetDelay:1950, strong:true,
+             hintText:'Double fault \u2014 first serve' },
+    let:   { dur:550,  keyframe:'serveFlightLet',   path:'M 205,545 Q 175,320 170,290',
+             flashDelay:460, flashDur:600, soundDelay:470, sound:playLetPluck,
+             text:'LET', color:'var(--court-line)', pos:{left:'58%', top:'44%'},
+             impactDelay:470, reveal:false, resetDelay:1150,
+             hintText:'Let \u2014 replay the point' }
+  };
+
+  function pickOutcome(){
+    const r = Math.random();
+    if (r < 0.65) return 'ace';
+    if (r < 0.85) return 'fault';
+    return 'let';
+  }
+
+  function resetAnimatedEl(el){
+    el.style.animation = 'none';
+    void el.offsetWidth;
+  }
+
+  function runOutcome(name){
+    const cfg = OUTCOMES[name];
+
+    [ball, ballLabel, racket, flightPath, resultFlash, landingRing].forEach(resetAnimatedEl);
+    flightPath.setAttribute('d', cfg.path);
+    landingRing.style.opacity = 0;
+
+    ball.style.animation = 'none';
+    ballLabel.style.animation = `labelOut 300ms ease forwards`;
+    ballZone.style.animation = `${cfg.keyframe} ${cfg.dur}ms cubic-bezier(.32,.68,.3,1) forwards`;
+    racket.style.animation = `serveSwing 420ms cubic-bezier(.25,.8,.3,1) forwards`;
+    flightPath.style.animation = `drawPath ${Math.round(cfg.dur * 0.82)}ms cubic-bezier(.3,.7,.3,1) 80ms forwards`;
+
+    resultFlash.textContent = cfg.text;
+    resultFlash.style.color = cfg.color;
+    resultFlash.style.left = cfg.pos.left;
+    resultFlash.style.top = cfg.pos.top;
+    resultFlash.style.fontSize = (name === 'doubleFault') ? 'clamp(0.95rem, 4.6vw, 1.5rem)' : '';
+    resultFlash.style.animation = `resultFlash ${cfg.flashDur}ms cubic-bezier(.2,.8,.3,1) ${cfg.flashDelay}ms forwards`;
+
+    if (name === 'ace'){
+      landingRing.style.animation = `ringPulse 600ms ease-out ${cfg.flashDelay - 40}ms forwards`;
+    }
+
+    playThwock();
+    cfg.sound(cfg.soundDelay);
+
+    const flashClass = cfg.strong ? 'impact-flash-strong' : 'impact-flash';
+    setTimeout(() => {
+      stage.classList.add(flashClass);
+      setTimeout(() => stage.classList.remove(flashClass), 420);
+    }, cfg.impactDelay);
+
+    if (cfg.reveal){
+      setTimeout(() => {
+        board.classList.add('show');
+        revealed = true;
+        announce(`Countdown revealed. Counting down to ${eventName}.`);
+      }, 1300);
+    } else {
+      hint.textContent = cfg.hintText;
+      hint.classList.remove('hidden');
+      if (name === 'doubleFault'){
+        doubleFaultCount++;
+        setTimeout(() => showDoubleFaultToast(doubleFaultCount), cfg.flashDelay);
+      }
+      setTimeout(resetForNextServe, cfg.resetDelay);
+    }
+  }
+
+  function resetForNextServe(){
+    ballZone.style.animation = '';
+    racket.style.animation = '';
+    flightPath.style.animation = '';
+    flightPath.style.opacity = 0;
+    resultFlash.style.animation = '';
+    landingRing.style.animation = '';
+    ballLabel.style.animation = '';
+    ball.style.animation = '';
+    hint.textContent = 'Tap the ball to serve';
+    hint.classList.remove('hidden');
+    animating = false;
+  }
+
+  function hit(){
+    if (animating) return;
+    animating = true;
+    markServed();
+
+    if (reduceMotion){
+      playThwock();
+      playAceChime(120);
+      stage.classList.add('impact-flash');
+      setTimeout(() => {
+        stage.classList.remove('impact-flash');
+        animating = false;
+      }, 300);
+      return;
+    }
+
+    hint.classList.add('hidden');
+
+    const raw = pickOutcome();
+    if (raw === 'ace'){
+      onSecondServe = false;
+      updateServeIndicator();
+      runOutcome('ace');
+    } else if (raw === 'fault'){
+      if (onSecondServe){
+        onSecondServe = false;
+        updateServeIndicator();
+        runOutcome('doubleFault');
+      } else {
+        onSecondServe = true;
+        updateServeIndicator();
+        runOutcome('fault');
+      }
+    } else {
+      runOutcome('let');
+    }
+  }
+
+  function replay(){
+    resetForNextServe();
+    board.classList.remove('show');
+    revealed = false;
+    onSecondServe = false;
+    updateServeIndicator();
+  }
+
+  updateServeIndicator();
+
+  ballZone.addEventListener('click', hit);
+  replayBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    replay();
+  });
+
+  // ================= Reduced motion: reveal immediately =================
+  if (reduceMotion){
+    board.classList.add('show');
+    revealed = true;
+    hint.textContent = 'Motion is reduced on your device \u2014 the countdown is shown on the court.';
+  }
+
+  // ================= Confetti / celebration =================
+  let celebrated = false;
+  function triggerConfetti(){
+    const colors = ['#D6EE45', '#F4F1E8', '#C1502E', '#8FA82A'];
+    for (let i = 0; i < 28; i++){
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random() * 100 + 'vw';
+      piece.style.background = colors[i % colors.length];
+      piece.style.animationDuration = (1.8 + Math.random() * 1.4) + 's';
+      piece.style.animationDelay = (Math.random() * 0.6) + 's';
+      piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+      document.body.appendChild(piece);
+      setTimeout(() => piece.remove(), 3600);
+    }
+  }
+
+  // ================= Countdown =================
+  const elDays = document.getElementById('d-days');
+  const elHours = document.getElementById('d-hours');
+  const elMins = document.getElementById('d-mins');
+  const elSecs = document.getElementById('d-secs');
+  const boardSub = document.getElementById('boardSub');
+  const boardTitle = document.getElementById('boardTitle');
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function flip(el){
+    el.classList.remove('flip');
+    void el.offsetWidth;
+    el.classList.add('flip');
+  }
+  function announce(msg){ srStatus.textContent = msg; }
+
+  const prev = { d: null, h: null, m: null, s: null };
+
+  function tick(){
+    const target = getTarget();
+    const now = new Date();
+    let diff = target.getTime() - now.getTime();
+
+    if (diff <= 0){
+      elDays.textContent = '00'; elHours.textContent = '00';
+      elMins.textContent = '00'; elSecs.textContent = '00';
+      boardSub.textContent = "It's here.";
+      if (!celebrated){
+        celebrated = true;
+        boardTitle.textContent = '🎾 Game on!';
+        board.classList.add('celebrate');
+        triggerConfetti();
+        announce("It's game time!");
+      }
+      return;
+    }
+
+    const days = Math.floor(diff / 86400000); diff -= days * 86400000;
+    const hours = Math.floor(diff / 3600000); diff -= hours * 3600000;
+    const mins = Math.floor(diff / 60000); diff -= mins * 60000;
+    const secs = Math.floor(diff / 1000);
+
+    elDays.textContent = pad2(days);
+    elHours.textContent = pad2(hours);
+    elMins.textContent = pad2(mins);
+    elSecs.textContent = pad2(secs);
+
+    if (revealed && !reduceMotion){
+      if (secs !== prev.s) flip(elSecs);
+      if (mins !== prev.m) flip(elMins);
+      if (hours !== prev.h) flip(elHours);
+      if (days !== prev.d) flip(elDays);
+    }
+    if (revealed && mins !== prev.m){
+      announce(`${days} days, ${hours} hours, ${mins} minutes until ${eventName}.`);
+    }
+    prev.d = days; prev.h = hours; prev.m = mins; prev.s = secs;
+
+    boardSub.textContent = target.toLocaleDateString(undefined, {
+      month:'short', day:'numeric', hour:'numeric', minute:'2-digit'
+    });
+  }
+
+  tick();
+  setInterval(tick, 1000);
+</script>
+
+</body>
+</html>
